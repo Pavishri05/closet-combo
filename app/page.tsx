@@ -1,6 +1,6 @@
 "use client"
-
-import { useState } from "react"
+import Cupboard from "./components/cupboard"
+import { useState,useEffect } from "react"
 
 export default function Home(){
 
@@ -9,7 +9,39 @@ const [outfit,setOutfit] = useState<any[]>([])
 const [history,setHistory] = useState<any[]>([])
 const [vibe,setVibe] = useState("casual")
 
-/* ---------------- COLOR DETECTION ---------------- */
+/* LOAD DATA */
+
+useEffect(()=>{
+
+const savedClothes = localStorage.getItem("clothes")
+const savedHistory = localStorage.getItem("history")
+
+if(savedClothes) setClothes(JSON.parse(savedClothes))
+if(savedHistory) setHistory(JSON.parse(savedHistory))
+
+},[])
+
+useEffect(()=>{
+localStorage.setItem("clothes",JSON.stringify(clothes))
+},[clothes])
+
+useEffect(()=>{
+localStorage.setItem("history",JSON.stringify(history))
+},[history])
+
+/* IMAGE CONVERSION */
+
+function fileToBase64(file:any){
+
+return new Promise((resolve)=>{
+const reader = new FileReader()
+reader.readAsDataURL(file)
+reader.onload = ()=>resolve(reader.result)
+})
+
+}
+
+/* COLOR DETECTION */
 
 function getDominantColor(imageFile:any){
 
@@ -19,7 +51,7 @@ const img = new Image()
 const canvas = document.createElement("canvas")
 const ctx = canvas.getContext("2d")
 
-img.onload = () => {
+img.onload = ()=>{
 
 canvas.width = img.width
 canvas.height = img.height
@@ -53,7 +85,7 @@ img.src = URL.createObjectURL(imageFile)
 
 }
 
-/* ---------------- UPLOAD CLOTHES ---------------- */
+/* UPLOAD CLOTHES */
 
 async function uploadClothes(e:any){
 
@@ -64,8 +96,7 @@ const newItems:any=[]
 
 for(const file of files){
 
-const imageURL = URL.createObjectURL(file)
-
+const imageURL:any = await fileToBase64(file)
 const color = await getDominantColor(file)
 
 const name = file.name.toLowerCase()
@@ -105,15 +136,26 @@ setClothes(prev => [...prev,...newItems])
 
 }
 
-/* ---------------- OUTFIT GENERATOR ---------------- */
+/* DELETE CLOTHING */
+
+function deleteClothing(index:number){
+
+const confirmDelete = window.confirm("Delete this clothing item?")
+if(!confirmDelete) return
+
+setClothes(prev => prev.filter((_,i)=> i !== index))
+
+}
+
+/* OUTFIT GENERATOR */
 
 function generateOutfit(){
 
 const available = clothes.filter(c=>!c.used)
 
-const tops = available.filter(c => c.type==="top")
-const bottoms = available.filter(c => c.type==="bottom")
-const dresses = available.filter(c => c.type==="dress")
+const tops = available.filter(c=>c.type==="top")
+const bottoms = available.filter(c=>c.type==="bottom")
+const dresses = available.filter(c=>c.type==="dress")
 
 if(vibe==="date" && dresses.length>0){
 
@@ -149,7 +191,7 @@ alert("Not enough clothing items")
 
 }
 
-/* ---------------- WEAR OUTFIT ---------------- */
+/* WEAR OUTFIT */
 
 function wearOutfit(){
 
@@ -177,9 +219,41 @@ setOutfit([])
 
 }
 
-/* ---------------- RESET LAUNDRY ---------------- */
+/* DELETE HISTORY */
+
+function deleteHistory(index:number){
+
+const confirmDelete = window.confirm("Delete this outfit history?")
+if(!confirmDelete) return
+
+setHistory(prev => prev.filter((_,i)=> i !== index))
+
+}
+
+/* RESET WARDROBE */
+
+function resetWardrobe(){
+
+const confirmReset = window.confirm("Are you sure you want to reset the entire wardrobe?")
+
+if(!confirmReset) return
+
+localStorage.removeItem("clothes")
+localStorage.removeItem("history")
+
+setClothes([])
+setHistory([])
+setOutfit([])
+
+}
+
+/* RESET LAUNDRY */
 
 function resetLaundry(){
+
+const confirmReset = window.confirm("Reset laundry and return clothes to wardrobe?")
+
+if(!confirmReset) return
 
 setClothes(prev =>
 prev.map(item => ({
@@ -190,25 +264,48 @@ used:false
 
 }
 
-/* ---------------- STATS ---------------- */
+/* STATS */
 
 const topsCount = clothes.filter(c=>c.type==="top").length
 const bottomsCount = clothes.filter(c=>c.type==="bottom").length
 const dressesCount = clothes.filter(c=>c.type==="dress").length
 
-/* ---------------- UI ---------------- */
+/* WHAT TO BUY SUGGESTIONS */
+
+const buySuggestions:any = []
+
+if(topsCount < 3){
+buySuggestions.push("Consider buying more tops 👕")
+}
+
+if(bottomsCount < 2){
+buySuggestions.push("You may need more jeans or trousers 👖")
+}
+
+if(dressesCount === 0){
+buySuggestions.push("A dress could be useful for special occasions 👗")
+}
+
+/* UI */
 
 return(
 
-<main className="min-h-screen bg-gray-100 text-black p-10">
+<main className="min-h-screen bg-gray-100 text-black p-10 max-w-6xl mx-auto">
 
 <h1 className="text-4xl font-bold mb-10">
 Closet Combo Genius 👗
 </h1>
 
+<Cupboard clothes={clothes} />
+
+<button
+onClick={resetWardrobe}
+className="bg-red-600 text-white px-4 py-2 rounded mb-8">
+Reset Wardrobe </button>
+
 <div className="grid grid-cols-2 gap-12">
 
-{/* LEFT SIDE : WARDROBE */}
+{/* LEFT SIDE */}
 
 <div>
 
@@ -235,71 +332,61 @@ Wardrobe Stats
 
 </div>
 
+{/* WHAT TO BUY */}
+
+<div className="mb-6 bg-white p-4 rounded shadow">
+
+<h3 className="font-semibold mb-2">
+Shopping Suggestions 🛍
+</h3>
+
+{buySuggestions.length === 0 ? (
+
+<p>Your wardrobe looks balanced 👍</p>
+
+) : (
+
+<ul className="list-disc ml-5">
+
+{buySuggestions.map((item:string,index:number)=>(
+
+<li key={index}>{item}</li>
+))}
+
+</ul>
+
+)}
+
+</div>
+
 <button
 onClick={resetLaundry}
 className="mb-6 bg-blue-600 text-white px-4 py-2 rounded">
 Reset Laundry </button>
 
-<div className="bg-[#d9c4a3] p-6 rounded-lg shadow">
+{/* LAUNDRY BASKET */}
 
-<div className="h-3 bg-[#7a5230] mb-6 rounded"></div>
+<div className="bg-white p-4 rounded shadow">
 
-<h3 className="font-semibold mb-3">Tops</h3>
+<h3 className="font-semibold mb-3">
+Laundry Basket 🧺
+</h3>
 
-<div className="flex flex-wrap gap-6 mb-6">
+<div className="flex flex-wrap gap-4">
 
-{clothes.filter(c=>c.type==="top").map((item,index)=>(
+{clothes.filter(c=>c.used).map((item,index)=>(
 
-<div key={index} className="flex flex-col items-center">
-
-<span>🪝</span>
-
-<img
-src={item.image}
-className={`w-24 h-32 object-contain bg-white p-2 rounded shadow ${item.used ? "opacity-40":""}`}
-/>
-
-</div>
-
-))}
-
-</div>
-
-<h3 className="font-semibold mb-3">Bottoms</h3>
-
-<div className="flex flex-wrap gap-6 mb-6">
-
-{clothes.filter(c=>c.type==="bottom").map((item,index)=>(
-
-<div key={index} className="flex flex-col items-center">
-
-<span>🪝</span>
+<div key={index} className="relative">
 
 <img
 src={item.image}
-className={`w-24 h-32 object-contain bg-white p-2 rounded shadow ${item.used ? "opacity-40":""}`}
+className="w-16 h-20 object-contain bg-gray-100 p-1 rounded"
 />
 
-</div>
-
-))}
-
-</div>
-
-<h3 className="font-semibold mb-3">Dresses</h3>
-
-<div className="flex flex-wrap gap-6">
-
-{clothes.filter(c=>c.type==="dress").map((item,index)=>(
-
-<div key={index} className="flex flex-col items-center">
-
-<span>🪝</span>
-
-<img
-src={item.image}
-className={`w-24 h-32 object-contain bg-white p-2 rounded shadow ${item.used ? "opacity-40":""}`}
-/>
+<button
+onClick={()=>deleteClothing(index)}
+className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 rounded">
+X </button>
 
 </div>
 
@@ -311,7 +398,7 @@ className={`w-24 h-32 object-contain bg-white p-2 rounded shadow ${item.used ? "
 
 </div>
 
-{/* RIGHT SIDE : GENERATOR */}
+{/* RIGHT SIDE */}
 
 <div>
 
@@ -347,20 +434,26 @@ className="bg-purple-600 text-white px-6 py-2 rounded mb-8">
 Generate Outfit </button>
 
 <h3 className="text-lg font-semibold mb-4">
-Suggested Outfit
+Outfit Preview 👤
 </h3>
 
-<div className="flex gap-6">
+<div className="flex justify-center">
+
+<div className="bg-white p-6 rounded shadow flex flex-col items-center gap-4 w-48">
+
+<div className="text-3xl">🧍</div>
 
 {outfit.map((item,index)=>(
 
 <img
 key={index}
 src={item.image}
-className="w-28 h-36 object-contain bg-white p-2 rounded shadow"
+className="w-24 h-28 object-contain bg-gray-50 p-2 rounded"
 />
 
 ))}
+
+</div>
 
 </div>
 
@@ -379,15 +472,27 @@ Outfit History
 
 <div key={index} className="bg-white p-4 rounded shadow">
 
-<p className="text-sm mb-2">{entry.date}</p>
+<div className="flex justify-between items-center mb-2">
+
+<p className="text-sm">{entry.date}</p>
+
+<button
+onClick={()=>deleteHistory(index)}
+className="text-red-500 text-sm">
+Delete </button>
+
+</div>
 
 <div className="flex gap-4">
 
-{entry.items.map((item:any,i:number)=>( <img
+{entry.items.map((item:any,i:number)=>(
+
+<img
 key={i}
 src={item.image}
 className="w-16 h-20 object-contain"
 />
+
 ))}
 
 </div>
